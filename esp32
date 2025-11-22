@@ -1,0 +1,70 @@
+#include <WiFi.h>
+#include <Firebase_ESP_Client.h>
+
+// ---------------------------
+// WIFI CREDENTIALS
+// ---------------------------
+#define WIFI_SSID "YOUR_WIFI_NAME"
+#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+
+// ---------------------------
+// FIREBASE CREDENTIALS
+// ---------------------------
+#define API_KEY "YOUR_API_KEY"
+#define DATABASE_URL "YOUR_DATABASE_URL"   // Example: https://aeroraksha-default-rtdb.firebaseio.com/
+
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
+
+// ---------------------------
+// SOUND SENSOR PIN (ANALOG)
+// ---------------------------
+const int soundSensor = 34;   // Use ADC pin on ESP32
+int thresholdValue = 2000;    // Adjust depending on your sensor sensitivity
+
+// ---------------------------
+// SETUP
+// ---------------------------
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(soundSensor, INPUT);
+
+  // WiFi Connection
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println("\nWiFi Connected!");
+
+  // Firebase Setup
+  config.api_key = API_KEY;
+  config.database_url = DATABASE_URL;
+
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+}
+
+// ---------------------------
+// MAIN LOOP
+// ---------------------------
+void loop() {
+  int soundValue = analogRead(soundSensor);
+  Serial.print("Sound Level: ");
+  Serial.println(soundValue);
+
+  if (soundValue > thresholdValue) {
+    Serial.println("⚠ Scream Detected! Sending Alert…");
+
+    Firebase.RTDB.setInt(&fbdo, "alerts/sound_level", soundValue);
+    Firebase.RTDB.setString(&fbdo, "alerts/status", "Scream detected");
+    Firebase.RTDB.setInt(&fbdo, "alerts/timestamp", millis());
+
+    delay(2000);   // Prevent multiple alerts
+  }
+
+  delay(200);  
+}
